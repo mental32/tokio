@@ -1,10 +1,9 @@
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::handle::Handle;
 use crate::runtime::shell::Shell;
 use crate::runtime::{blocking, io, time, Callback, Runtime, Spawner};
 
 use std::fmt;
-#[cfg(not(loom))]
-use std::sync::Arc;
 
 /// Builds Tokio Runtime with custom configuration values.
 ///
@@ -263,7 +262,7 @@ impl Builder {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.after_start = Some(Arc::new(f));
+        self.after_start = Some(std::sync::Arc::new(f));
         self
     }
 
@@ -303,7 +302,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime::Builder;
     ///
-    /// let mut rt = Builder::new().build().unwrap();
+    /// let rt  = Builder::new().build().unwrap();
     ///
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");
@@ -334,7 +333,7 @@ impl Builder {
         let blocking_spawner = blocking_pool.spawner().clone();
 
         Ok(Runtime {
-            kind: Kind::Shell(Shell::new(driver)),
+            kind: Kind::Shell(Arc::new(Mutex::new(Shell::new(driver)))),
             handle: Handle {
                 spawner,
                 io_handle,
@@ -433,7 +432,7 @@ cfg_rt_core! {
             let blocking_spawner = blocking_pool.spawner().clone();
 
             Ok(Runtime {
-                kind: Kind::Basic(scheduler),
+                kind: Kind::Basic(Arc::new(Mutex::new(scheduler))),
                 handle: Handle {
                     spawner,
                     io_handle,
@@ -493,7 +492,7 @@ cfg_rt_threaded! {
             handle.enter(|| launch.launch());
 
             Ok(Runtime {
-                kind: Kind::ThreadPool(scheduler),
+                kind: Kind::ThreadPool(Arc::new(scheduler)),
                 handle,
                 blocking_pool,
             })
